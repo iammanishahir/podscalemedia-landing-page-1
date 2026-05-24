@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PodScaleMedia — Turn Your Podcast Into a Client Machine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #161616;
+    --border: #222222;
+    --border2: #2a2a2a;
+    --text: #f0ede8;
+    --muted: #6b6b6b;
+    --muted2: #444;
+    --accent: #e8d5a3;
+    --accent2: #c9a96e;
+    --green: #4ade80;
+    --red: #f87171;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Geist', sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .cursor-glow {
+    position: fixed;
+    width: 500px; height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(201,169,110,0.055) 0%, transparent 65%);
+    pointer-events: none;
+    z-index: 0;
+    transform: translate(-50%,-50%);
+    transition: left 0.12s linear, top 0.12s linear;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 40px; height: 60px;
+    background: rgba(10,10,10,0.0);
+    backdrop-filter: blur(0px);
+    border-bottom: 1px solid transparent;
+    transition: background 0.45s, backdrop-filter 0.45s, border-color 0.45s;
+  }
+  nav.scrolled {
+    background: rgba(10,10,10,0.9);
+    backdrop-filter: blur(20px);
+    border-color: var(--border);
+  }
+  .nav-logo {
+    font-family: 'Instrument Serif', serif;
+    font-size: 20px; color: var(--text);
+    letter-spacing: -0.3px; text-decoration: none;
+  }
+  .nav-logo span { color: var(--accent2); }
+  .nav-links { display: flex; gap: 32px; align-items: center; }
+  .nav-links a {
+    color: var(--muted); text-decoration: none;
+    font-size: 13.5px; font-weight: 400;
+    letter-spacing: 0.01em; transition: color 0.2s;
+    position: relative;
+  }
+  .nav-links a:not(.nav-cta)::after {
+    content: '';
+    position: absolute; bottom: -2px; left: 0; right: 0;
+    height: 1px; background: var(--accent2);
+    transform: scaleX(0); transform-origin: left;
+    transition: transform 0.25s ease;
+  }
+  .nav-links a:not(.nav-cta):hover::after { transform: scaleX(1); }
+  .nav-links a:hover { color: var(--text); }
+  .nav-cta {
+    background: var(--accent); color: #0a0a0a !important;
+    padding: 7px 18px; border-radius: 6px;
+    font-weight: 600 !important; font-size: 13px !important;
+    transition: background 0.2s, transform 0.2s, box-shadow 0.2s !important;
+  }
+  .nav-cta:hover {
+    background: var(--accent2) !important; color: #fff !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(201,169,110,0.3);
+  }
+
+  /* HAMBURGER */
+  .hamburger {
+    display: none; flex-direction: column; gap: 5px;
+    cursor: pointer; padding: 8px;
+    border: 1px solid var(--border2); border-radius: 8px;
+    background: var(--surface);
+    transition: border-color 0.2s; z-index: 300;
+    outline: none; background: transparent; border: 1px solid var(--border2);
+  }
+  .hamburger:hover { border-color: var(--accent2); }
+  .hamburger span {
+    display: block; width: 20px; height: 1.5px;
+    background: var(--text); border-radius: 2px;
+    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    transform-origin: center;
+  }
+  .hamburger.open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+  .hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+  .hamburger.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+
+  /* MOBILE DRAWER */
+  .mobile-menu {
+    display: none; position: fixed; top: 60px; left: 0; right: 0;
+    background: rgba(10,10,10,0.97); backdrop-filter: blur(24px);
+    border-bottom: 1px solid var(--border);
+    z-index: 199; max-height: 0; overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1);
+  }
+  .mobile-menu.open { max-height: 420px; }
+  .mobile-menu-inner {
+    display: flex; flex-direction: column;
+    padding: 24px 24px 32px; gap: 4px;
+  }
+  .mobile-menu a {
+    color: var(--muted); text-decoration: none;
+    font-size: 15px; padding: 13px 0;
+    border-bottom: 1px solid var(--border);
+    transition: color 0.2s, padding-left 0.25s;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .mobile-menu a:last-child { border-bottom: none; }
+  .mobile-menu a:hover { color: var(--text); padding-left: 8px; }
+  .mobile-menu a.mobile-cta {
+    margin-top: 16px; background: var(--accent);
+    color: #0a0a0a; border: none; border-radius: 8px;
+    padding: 14px 20px; font-weight: 600; justify-content: center;
+  }
+  .mobile-menu a.mobile-cta:hover { background: var(--accent2); color: #fff; padding-left: 20px; }
+
+  /* HERO */
+  .hero {
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 100px 24px 80px;
+    position: relative; overflow: hidden;
+  }
+  .hero-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, black 20%, transparent 100%);
+    pointer-events: none;
+    animation: gridDrift 25s linear infinite;
+  }
+  @keyframes gridDrift {
+    0%{ background-position: 0 0; }
+    100%{ background-position: 60px 60px; }
+  }
+  .hero-glow {
+    position: absolute; top: -15%; left: 50%;
+    transform: translateX(-50%);
+    width: 800px; height: 500px;
+    background: radial-gradient(ellipse, rgba(201,169,110,0.09) 0%, transparent 70%);
+    pointer-events: none;
+    animation: glowPulse 5s ease-in-out infinite;
+  }
+  @keyframes glowPulse {
+    0%,100%{ opacity: 0.5; transform: translateX(-50%) scale(1); }
+    50%{ opacity: 1; transform: translateX(-50%) scale(1.06); }
+  }
+  .orb {
+    position: absolute; border-radius: 50%;
+    filter: blur(80px); pointer-events: none; z-index: 0;
+  }
+  .orb-1 {
+    width: 320px; height: 320px;
+    background: rgba(201,169,110,0.055);
+    top: 22%; left: 8%;
+    animation: float1 9s ease-in-out infinite;
+  }
+  .orb-2 {
+    width: 220px; height: 220px;
+    background: rgba(201,169,110,0.04);
+    bottom: 22%; right: 7%;
+    animation: float2 11s ease-in-out infinite;
+  }
+  @keyframes float1 {
+    0%,100%{ transform: translateY(0) translateX(0); }
+    33%{ transform: translateY(-28px) translateX(12px); }
+    66%{ transform: translateY(14px) translateX(-10px); }
+  }
+  @keyframes float2 {
+    0%,100%{ transform: translateY(0) translateX(0); }
+    50%{ transform: translateY(-22px) translateX(-18px); }
+  }
+
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: 100px; padding: 5px 14px;
+    font-size: 12px; color: var(--muted);
+    letter-spacing: 0.05em; text-transform: uppercase;
+    margin-bottom: 36px; position: relative; z-index: 1;
+    opacity: 0; animation: fadeUp 0.7s 0.1s ease forwards;
+  }
+  .hero-badge .dot {
+    width: 6px; height: 6px; background: var(--green); border-radius: 50%;
+    animation: livePulse 2s infinite;
+  }
+  @keyframes livePulse {
+    0%,100%{ box-shadow: 0 0 0 0 rgba(74,222,128,0.5); }
+    50%{ box-shadow: 0 0 0 5px rgba(74,222,128,0); }
+  }
+  .hero h1 {
+    font-family: 'Instrument Serif', serif;
+    font-size: clamp(42px, 7vw, 88px);
+    font-weight: 400; line-height: 1.05; letter-spacing: -1.5px;
+    max-width: 820px; color: var(--text);
+    position: relative; z-index: 1;
+    opacity: 0; animation: fadeUp 0.8s 0.25s ease forwards;
+  }
+  .hero h1 em { font-style: italic; color: var(--accent2); }
+  .hero-sub {
+    font-size: 17px; color: var(--muted);
+    max-width: 520px; margin: 24px auto 0;
+    line-height: 1.7; font-weight: 300;
+    position: relative; z-index: 1;
+    opacity: 0; animation: fadeUp 0.8s 0.4s ease forwards;
+  }
+  .hero-actions {
+    display: flex; gap: 12px; margin-top: 40px;
+    flex-wrap: wrap; justify-content: center;
+    position: relative; z-index: 1;
+    opacity: 0; animation: fadeUp 0.8s 0.55s ease forwards;
+  }
+  .hero-note {
+    font-size: 12px; color: var(--muted2); margin-top: 16px;
+    position: relative; z-index: 1;
+    opacity: 0; animation: fadeUp 0.8s 0.7s ease forwards;
+  }
+
+  /* BUTTONS */
+  .btn-primary {
+    background: var(--accent); color: #0a0a0a;
+    padding: 13px 28px; border-radius: 8px;
+    font-weight: 600; font-size: 14px; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: all 0.25s; position: relative; overflow: hidden;
+  }
+  .btn-primary::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(110deg, transparent 25%, rgba(255,255,255,0.18) 50%, transparent 75%);
+    transform: translateX(-100%);
+    transition: transform 0.55s ease;
+  }
+  .btn-primary:hover::before { transform: translateX(100%); }
+  .btn-primary:hover {
+    background: var(--accent2); color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 35px rgba(201,169,110,0.38);
+  }
+  .btn-ghost {
+    background: transparent; color: var(--muted);
+    padding: 13px 28px; border-radius: 8px;
+    font-size: 14px; text-decoration: none;
+    border: 1px solid var(--border2);
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: all 0.25s;
+  }
+  .btn-ghost:hover {
+    color: var(--text); border-color: #444;
+    transform: translateY(-1px);
+    background: rgba(255,255,255,0.03);
+  }
+
+  /* MARQUEE */
+  .marquee-section {
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 0; overflow: hidden;
+  }
+  .marquee-track {
+    display: flex; gap: 48px;
+    animation: marquee 22s linear infinite; white-space: nowrap;
+  }
+  .marquee-track:hover { animation-play-state: paused; }
+  .marquee-item {
+    color: var(--muted2); font-size: 12px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+    transition: color 0.2s;
+  }
+  .marquee-item:hover { color: var(--accent2); }
+  .marquee-item::before { content: '◆'; color: var(--accent2); font-size: 8px; }
+  @keyframes marquee {
+    0%{ transform: translateX(0); }
+    100%{ transform: translateX(-50%); }
+  }
+
+  /* SECTIONS */
+  section { padding: 100px 24px; max-width: 1100px; margin: 0 auto; }
+  .section-tag {
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent2); font-weight: 500; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-tag::before { content: ''; width: 20px; height: 1px; background: var(--accent2); }
+  .section-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: clamp(32px, 4.5vw, 54px);
+    font-weight: 400; letter-spacing: -1px; line-height: 1.1;
+    max-width: 680px; margin-bottom: 16px;
+  }
+  .section-title em { font-style: italic; color: var(--accent2); }
+  .section-sub {
+    color: var(--muted); font-size: 16px;
+    max-width: 520px; line-height: 1.7; font-weight: 300;
+  }
+
+  /* STATS */
+  .stats-row {
+    display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 1px; background: var(--border);
+    border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden; margin-top: 60px;
+  }
+  .stat-item {
+    background: var(--surface); padding: 36px 28px; text-align: center;
+    transition: background 0.3s;
+  }
+  .stat-item:hover { background: var(--surface2); }
+  .stat-num {
+    font-family: 'Instrument Serif', serif;
+    font-size: 48px; font-weight: 400; color: var(--accent);
+    line-height: 1; display: block; letter-spacing: -1px;
+  }
+  .stat-label { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+
+  /* FEATURED VIDEO */
+  .featured-video-wrap {
+    width: 100%; max-width: 900px;
+    margin: 60px auto 0;
+    border-radius: 16px; overflow: hidden;
+    border: 1px solid var(--border);
+    position: relative; background: #000;
+    transition: border-color 0.3s, transform 0.35s, box-shadow 0.35s;
+  }
+  .featured-video-wrap:hover {
+    border-color: var(--accent2);
+    transform: translateY(-4px);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.55);
+  }
+  .featured-video-wrap video {
+    width: 100%; display: block;
+    aspect-ratio: 16/9; object-fit: cover;
+  }
+  .featured-video-tag {
+    position: absolute; top: 16px; left: 16px;
+    background: rgba(0,0,0,0.75);
+    border: 1px solid var(--border2);
+    border-radius: 6px; padding: 5px 12px;
+    font-size: 11px; color: var(--muted);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    z-index: 2; backdrop-filter: blur(8px);
+  }
+
+  /* REELS GRID */
+  .reels-grid {
+    display: grid; grid-template-columns: repeat(3,1fr);
+    gap: 16px; margin-top: 24px; max-width: 900px;
+    margin-left: auto; margin-right: auto;
+  }
+  .reel-card {
+    position: relative; border-radius: 12px; overflow: hidden;
+    border: 1px solid var(--border); background: #000;
+    aspect-ratio: 9/16;
+    transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+  }
+  .reel-card:hover {
+    border-color: var(--accent2);
+    transform: translateY(-5px) scale(1.015);
+    box-shadow: 0 16px 50px rgba(0,0,0,0.5);
+  }
+  .reel-card video {
+    width: 100%; height: 100%;
+    object-fit: cover; display: block;
+  }
+  .reel-label {
+    position: absolute; top: 10px; left: 10px;
+    background: rgba(0,0,0,0.75);
+    border: 1px solid var(--border2);
+    border-radius: 5px; padding: 3px 9px;
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    backdrop-filter: blur(8px); z-index: 2;
+  }
+
+  /* HOW IT WORKS */
+  .how-works-grid {
+    display: grid; grid-template-columns: repeat(3,1fr);
+    gap: 1px; background: var(--border);
+    border: 1px solid var(--border); border-radius: 16px;
+    overflow: hidden; margin-top: 60px;
+  }
+  .step-card {
+    background: var(--surface); padding: 40px 32px;
+    transition: background 0.3s; position: relative; overflow: hidden;
+  }
+  .step-card::after {
+    content: '';
+    position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent2), transparent);
+    transform: scaleX(0); transform-origin: center;
+    transition: transform 0.4s ease;
+  }
+  .step-card:hover { background: var(--surface2); }
+  .step-card:hover::after { transform: scaleX(1); }
+  .step-num {
+    font-family: 'Instrument Serif', serif;
+    font-size: 64px; font-weight: 400;
+    color: var(--border2); line-height: 1;
+    display: block; letter-spacing: -2px; transition: color 0.3s;
+  }
+  .step-card:hover .step-num { color: rgba(201,169,110,0.18); }
+  .step-title { font-size: 17px; font-weight: 500; color: var(--text); margin: 16px 0 10px; }
+  .step-body { font-size: 13.5px; color: var(--muted); line-height: 1.65; font-weight: 300; }
+  .step-tags { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .step-tag {
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: 4px; padding: 3px 10px;
+    font-size: 11px; color: var(--muted);
+  }
+
+  /* SERVICES */
+  .services-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-top: 60px; }
+  .service-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 32px 28px;
+    transition: border-color 0.3s, transform 0.35s, box-shadow 0.35s;
+    position: relative; overflow: hidden;
+  }
+  .service-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent2), transparent);
+    transform: scaleX(0); transform-origin: center;
+    transition: transform 0.4s ease;
+  }
+  .service-card:hover {
+    border-color: rgba(201,169,110,0.3);
+    transform: translateY(-5px);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .service-card:hover::before { transform: scaleX(1); }
+  .service-num { font-family: 'Instrument Serif', serif; font-size: 13px; color: var(--accent2); letter-spacing: 0.05em; margin-bottom: 20px; display: block; }
+  .service-title { font-size: 17px; font-weight: 500; color: var(--text); margin-bottom: 10px; line-height: 1.3; }
+  .service-body { font-size: 13px; color: var(--muted); line-height: 1.65; font-weight: 300; margin-bottom: 20px; }
+  .service-features { display: flex; flex-direction: column; gap: 6px; }
+  .service-feature {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 12.5px; color: var(--muted);
+  }
+  .service-feature::before { content: '→'; color: var(--accent2); font-size: 11px; margin-top: 1px; flex-shrink: 0; }
+
+  /* COMPARISON */
+  .comparison-wrap { margin-top: 60px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .comp-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden; transition: transform 0.3s;
+  }
+  .comp-card.them { opacity: 0.65; }
+  .comp-card.us { border-color: rgba(201,169,110,0.2); }
+  .comp-card:hover { transform: translateY(-3px); }
+  .comp-header {
+    padding: 20px 28px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; font-weight: 500; color: var(--muted);
+  }
+  .comp-card.us .comp-header { color: var(--text); }
+  .comp-header .badge {
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: 4px; padding: 2px 9px;
+    font-size: 10px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted2);
+  }
+  .comp-card.us .comp-header .badge {
+    background: rgba(232,213,163,0.12);
+    border-color: rgba(232,213,163,0.25);
+    color: var(--accent2);
+  }
+  .comp-list { padding: 20px 28px; display: flex; flex-direction: column; gap: 12px; }
+  .comp-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    font-size: 13.5px; color: var(--muted); line-height: 1.4;
+  }
+  .comp-card.us .comp-item { color: var(--text); }
+  .comp-icon { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
+  .comp-card.them .comp-icon { color: var(--red); }
+  .comp-card.us .comp-icon { color: var(--green); }
+
+  /* FAQ */
+  .faq-list { margin-top: 60px; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .faq-item { border-bottom: 1px solid var(--border); }
+  .faq-item:last-child { border-bottom: none; }
+  .faq-q {
+    width: 100%; background: var(--surface); border: none; text-align: left;
+    padding: 22px 28px; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 14.5px; font-weight: 400; color: var(--text);
+    transition: background 0.2s, padding-left 0.25s;
+  }
+  .faq-q:hover { background: var(--surface2); padding-left: 34px; }
+  .faq-q .icon {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 1px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.35s; font-size: 14px; color: var(--muted);
+  }
+  .faq-item.open .faq-q .icon {
+    background: var(--accent); border-color: var(--accent);
+    color: #0a0a0a; transform: rotate(45deg);
+  }
+  .faq-a {
+    background: var(--surface2); border-top: 1px solid var(--border);
+    padding: 0 28px; max-height: 0; overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1), padding 0.4s ease;
+    font-size: 14px; color: var(--muted); line-height: 1.7; font-weight: 300;
+  }
+  .faq-item.open .faq-a { max-height: 200px; padding: 20px 28px; }
+
+  /* CTA */
+  .cta-section { max-width: 1100px; margin: 0 auto 100px; padding: 0 24px; }
+  .cta-inner {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 80px 60px; text-align: center;
+    position: relative; overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .cta-inner:hover {
+    border-color: rgba(201,169,110,0.25);
+    box-shadow: 0 0 80px rgba(201,169,110,0.06);
+  }
+  .cta-inner::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 60% 70% at 50% 0%, rgba(201,169,110,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .cta-shine {
+    position: absolute; inset: 0;
+    background: linear-gradient(110deg, transparent 20%, rgba(201,169,110,0.06) 50%, transparent 80%);
+    background-size: 200% 100%;
+    animation: ctaShine 4s ease infinite;
+    pointer-events: none;
+  }
+  @keyframes ctaShine {
+    0%{ background-position: -200% 0; }
+    100%{ background-position: 200% 0; }
+  }
+  .cta-inner h2 {
+    font-family: 'Instrument Serif', serif;
+    font-size: clamp(32px, 4.5vw, 56px); font-weight: 400;
+    letter-spacing: -1px; line-height: 1.1;
+    max-width: 640px; margin: 0 auto 16px;
+    position: relative; z-index: 1;
+  }
+  .cta-inner h2 em { font-style: italic; color: var(--accent2); }
+  .cta-inner p {
+    color: var(--muted); font-size: 16px; max-width: 460px;
+    margin: 0 auto 40px; font-weight: 300; line-height: 1.7;
+    position: relative; z-index: 1;
+  }
+  .cta-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; position: relative; z-index: 1; }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px 40px; display: flex;
+    justify-content: space-between; align-items: center;
+    max-width: 1100px; margin: 0 auto;
+  }
+  footer .logo { font-family: 'Instrument Serif', serif; font-size: 17px; color: var(--text); text-decoration: none; }
+  footer .logo span { color: var(--accent2); }
+  footer .copy { font-size: 12px; color: var(--muted2); }
+  footer .links { display: flex; gap: 24px; }
+  footer .links a { font-size: 12px; color: var(--muted2); text-decoration: none; transition: color 0.2s; }
+  footer .links a:hover { color: var(--muted); }
+
+  /* ANIMATIONS */
+  @keyframes fadeUp {
+    from{ opacity:0; transform:translateY(24px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  .reveal {
+    opacity: 0; transform: translateY(32px);
+    transition: opacity 0.75s cubic-bezier(0.4,0,0.2,1), transform 0.75s cubic-bezier(0.4,0,0.2,1);
+  }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+  .reveal-delay-1 { transition-delay: 0.12s; }
+  .reveal-delay-2 { transition-delay: 0.22s; }
+  .reveal-delay-3 { transition-delay: 0.32s; }
+
+  .divider { border: none; border-top: 1px solid var(--border); max-width: 1100px; margin: 0 auto; }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    nav { padding: 0 20px; }
+    .nav-links { display: none; }
+    .hamburger { display: flex; }
+    .mobile-menu { display: block; }
+    .stats-row { grid-template-columns: repeat(2,1fr); }
+    .how-works-grid { grid-template-columns: 1fr; }
+    .services-grid { grid-template-columns: 1fr; }
+    .comparison-wrap { grid-template-columns: 1fr; }
+    .cta-inner { padding: 48px 24px; }
+    footer { flex-direction: column; gap: 20px; text-align: center; }
+    .hero h1 { font-size: 38px; }
+    .reels-grid { gap: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cursor-glow" id="cursorGlow"></div>
+
+<!-- NAV -->
+<nav id="mainNav">
+  <a href="#" class="nav-logo">PodScale<span>Media</span></a>
+  <div class="nav-links">
+    <a href="#about">About</a>
+    <a href="#how">How It Works</a>
+    <a href="#services">Services</a>
+    <a href="#faq">FAQ</a>
+    <a href="https://calendly.com/manishkumarofficial100/30min" target="_blank" class="nav-cta">Book a Call →</a>
+  </div>
+  <button class="hamburger" id="hamburger" onclick="toggleMenu()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+
+<!-- MOBILE DRAWER -->
+<div class="mobile-menu" id="mobileMenu">
+  <div class="mobile-menu-inner">
+    <a href="#about" onclick="closeMenu()">About <span>→</span></a>
+    <a href="#how" onclick="closeMenu()">How It Works <span>→</span></a>
+    <a href="#services" onclick="closeMenu()">Services <span>→</span></a>
+    <a href="#faq" onclick="closeMenu()">FAQ <span>→</span></a>
+    <a href="https://calendly.com/manishkumarofficial100/30min" target="_blank" class="mobile-cta" onclick="closeMenu()">Book a Free Strategy Call →</a>
+  </div>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="hero-badge"><span class="dot"></span>Accepting New Clients</div>
+  <h1>Turn Your Podcast Into a<br><em>Client Acquisition</em> Machine</h1>
+  <p class="hero-sub">We help podcasters, coaches, founders, and consultants transform long-form episodes into high-retention short-form content — driving reach, authority, and inbound leads.</p>
+  <div class="hero-actions">
+    <a href="https://calendly.com/manishkumarofficial100/30min" target="_blank" class="btn-primary">Book a Free Strategy Call →</a>
+    <a href="#how" class="btn-ghost">See How It Works</a>
+  </div>
+  <p class="hero-note">Free 30-min call · No pressure · 70+ expert editors</p>
+</section>
+
+<!-- MARQUEE -->
+<div class="marquee-section">
+  <div class="marquee-track">
+    <span class="marquee-item">Podcast Clipping</span>
+    <span class="marquee-item">Short-Form Repurposing</span>
+    <span class="marquee-item">High-Retention Editing</span>
+    <span class="marquee-item">Reels & Shorts</span>
+    <span class="marquee-item">Hook-Based Content</span>
+    <span class="marquee-item">Authority Building</span>
+    <span class="marquee-item">Inbound Lead Generation</span>
+    <span class="marquee-item">Thumbnail Design</span>
+    <span class="marquee-item">Podcast Trailers</span>
+    <span class="marquee-item">Data-Backed Strategy</span>
+    <span class="marquee-item">Podcast Clipping</span>
+    <span class="marquee-item">Short-Form Repurposing</span>
+    <span class="marquee-item">High-Retention Editing</span>
+    <span class="marquee-item">Reels & Shorts</span>
+    <span class="marquee-item">Hook-Based Content</span>
+    <span class="marquee-item">Authority Building</span>
+    <span class="marquee-item">Inbound Lead Generation</span>
+    <span class="marquee-item">Thumbnail Design</span>
+    <span class="marquee-item">Podcast Trailers</span>
+    <span class="marquee-item">Data-Backed Strategy</span>
+  </div>
+</div>
+
+<!-- ABOUT + STATS -->
+<section id="about" class="reveal">
+  <div class="section-tag">About Us</div>
+  <h2 class="section-title">We Build Podcast <em>Growth Systems</em> That Convert</h2>
+  <p class="section-sub">We specialise in turning podcast content into powerful growth engines — building authority, attracting the right audience, and converting attention into inbound clients, consistently.</p>
+  <div class="stats-row">
+    <div class="stat-item reveal reveal-delay-1"><span class="stat-num">10M+</span><div class="stat-label">Total views generated</div></div>
+    <div class="stat-item reveal reveal-delay-2"><span class="stat-num">20%</span><div class="stat-label">Average audience growth</div></div>
+    <div class="stat-item reveal reveal-delay-3"><span class="stat-num">49%</span><div class="stat-label">Growth in client revenue</div></div>
+    <div class="stat-item reveal" style="transition-delay:0.42s"><span class="stat-num">70+</span><div class="stat-label">Expert video editors</div></div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- VIDEO SHOWCASE -->
+<section id="showcase" class="reveal">
+  <div class="section-tag">Our Work</div>
+  <h2 class="section-title">See the <em>Results</em> We Deliver</h2>
+  <p class="section-sub">Watch real podcast clips we've transformed into scroll-stopping short-form content that drives views, engagement, and leads.</p>
+
+  <!-- MAIN FEATURED VIDEO — root level path -->
+  <div class="featured-video-wrap reveal">
+    <div class="featured-video-tag">Featured Work</div>
+    <video autoplay loop muted playsinline>
+      <source src="podcast_trailer.mp4" type="video/mp4">
+    </video>
+  </div>
+
+  <!-- REELS — root level paths -->
+  <div class="reels-grid">
+    <div class="reel-card reveal reveal-delay-1">
+      <div class="reel-label">Reel 01</div>
+      <video autoplay loop muted playsinline>
+        <source src="reel_1.mp4" type="video/mp4">
+      </video>
+    </div>
+    <div class="reel-card reveal reveal-delay-2">
+      <div class="reel-label">Reel 02</div>
+      <video autoplay loop muted playsinline>
+        <source src="reel_2.mp4" type="video/mp4">
+      </video>
+    </div>
+    <div class="reel-card reveal reveal-delay-3">
+      <div class="reel-label">Reel 03</div>
+      <video autoplay loop muted playsinline>
+        <source src="reel_3.mp4" type="video/mp4">
+      </video>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- HOW IT WORKS -->
+<section id="how" class="reveal">
+  <div class="section-tag">Process</div>
+  <h2 class="section-title">From Strategy <em>To Growth</em></h2>
+  <p class="section-sub">We plan, create, and scale your podcast content system for reach, authority, and inbound leads — end to end.</p>
+  <div class="how-works-grid">
+    <div class="step-card reveal">
+      <span class="step-num">01</span>
+      <div class="step-title">Discover & Strategy</div>
+      <p class="step-body">We audit your podcast, audience, and content gaps to build a winning growth plan tailored to your niche and goals.</p>
+      <div class="step-tags"><span class="step-tag">Content Audit</span><span class="step-tag">Audience Research</span><span class="step-tag">Growth Plan</span></div>
+    </div>
+    <div class="step-card reveal reveal-delay-1">
+      <span class="step-num">02</span>
+      <div class="step-title">Content & Distribution</div>
+      <p class="step-body">We create clips, thumbnails, trailers, and platform-ready content built for maximum visibility and engagement across every channel.</p>
+      <div class="step-tags"><span class="step-tag">Clips & Reels</span><span class="step-tag">Thumbnails</span><span class="step-tag">Multi-Platform</span></div>
+    </div>
+    <div class="step-card reveal reveal-delay-2">
+      <span class="step-num">03</span>
+      <div class="step-title">Optimise & Scale</div>
+      <p class="step-body">We track performance, double down on what works, and scale your content system for compounding, long-term growth.</p>
+      <div class="step-tags"><span class="step-tag">Analytics</span><span class="step-tag">A/B Testing</span><span class="step-tag">Scaling</span></div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- SERVICES -->
+<section id="services" class="reveal">
+  <div class="section-tag">Services</div>
+  <h2 class="section-title">Everything You Need to <em>Grow</em></h2>
+  <p class="section-sub">Powerful services built for fast-growing personal brands. Create campaigns, boost engagement, and build a dominant presence.</p>
+  <div class="services-grid">
+    <div class="service-card reveal">
+      <span class="service-num">01 — Full System</span>
+      <div class="service-title">Podcast Content Engine</div>
+      <p class="service-body">We transform every episode into strategic content built for growth, visibility, and consistent client acquisition.</p>
+      <div class="service-features">
+        <div class="service-feature">Podcast Clipping & Repurposing</div>
+        <div class="service-feature">Brand Guidelines</div>
+        <div class="service-feature">Hooks + Scroll-Stopping Titles</div>
+        <div class="service-feature">Thumbnail Design</div>
+        <div class="service-feature">Podcast Trailers</div>
+      </div>
+    </div>
+    <div class="service-card reveal reveal-delay-1">
+      <span class="service-num">02 — Strategy</span>
+      <div class="service-title">Strategic Podcast Clipping</div>
+      <p class="service-body">We identify your best moments and turn them into high-retention clips designed for reach, engagement, and inbound leads.</p>
+      <div class="service-features">
+        <div class="service-feature">Viral Hook Selection</div>
+        <div class="service-feature">Short-Form Clips</div>
+        <div class="service-feature">Retention-First Editing</div>
+        <div class="service-feature">Reels + Shorts Formatting</div>
+        <div class="service-feature">Audience-Focused Positioning</div>
+      </div>
+    </div>
+    <div class="service-card reveal reveal-delay-2">
+      <span class="service-num">03 — Growth</span>
+      <div class="service-title">High-Retention Clipping</div>
+      <p class="service-body">We turn your best podcast moments into engaging clips that stop scrolls, increase watch time, and drive consistent audience growth.</p>
+      <div class="service-features">
+        <div class="service-feature">Hook-Based Editing</div>
+        <div class="service-feature">Captions + Subtitles</div>
+        <div class="service-feature">Reels + Shorts Optimisation</div>
+        <div class="service-feature">Fast-Paced Retention Cuts</div>
+        <div class="service-feature">Scroll-Stopping Openings</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- COMPARISON -->
+<section id="compare" class="reveal">
+  <div class="section-tag">Comparison</div>
+  <h2 class="section-title">Why PodScaleMedia <em>Stands Out</em></h2>
+  <p class="section-sub">We don't just edit podcasts. Everything we build is designed for authority, long-term growth, and client acquisition.</p>
+  <div class="comparison-wrap">
+    <div class="comp-card them reveal">
+      <div class="comp-header"><span>Others</span><span class="badge">Typical Agency</span></div>
+      <div class="comp-list">
+        <div class="comp-item"><span class="comp-icon">✕</span>Basic video editing only</div>
+        <div class="comp-item"><span class="comp-icon">✕</span>No real content strategy</div>
+        <div class="comp-item"><span class="comp-icon">✕</span>Inconsistent posting systems</div>
+        <div class="comp-item"><span class="comp-icon">✕</span>Weak hooks and poor retention</div>
+        <div class="comp-item"><span class="comp-icon">✕</span>Guesswork instead of analytics</div>
+        <div class="comp-item"><span class="comp-icon">✕</span>Short-term views, no real growth</div>
+      </div>
+    </div>
+    <div class="comp-card us reveal reveal-delay-1">
+      <div class="comp-header"><span>PodScaleMedia</span><span class="badge">Our Approach</span></div>
+      <div class="comp-list">
+        <div class="comp-item"><span class="comp-icon">✓</span>Full podcast growth system</div>
+        <div class="comp-item"><span class="comp-icon">✓</span>Strategic short-form repurposing</div>
+        <div class="comp-item"><span class="comp-icon">✓</span>Hooks built for reach and retention</div>
+        <div class="comp-item"><span class="comp-icon">✓</span>Data-backed decision making</div>
+        <div class="comp-item"><span class="comp-icon">✓</span>Built for authority and inbound leads</div>
+        <div class="comp-item"><span class="comp-icon">✓</span>Built for long-term scalability</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- FAQ -->
+<section id="faq" class="reveal">
+  <div class="section-tag">FAQ</div>
+  <h2 class="section-title">Common <em>Questions</em></h2>
+  <p class="section-sub">Everything you need to know about our services, timelines, and what to expect.</p>
+  <div class="faq-list">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFAQ(this)">How long does setup take?<span class="icon">+</span></button>
+      <div class="faq-a">Most clients are fully onboarded and ready to scale within 5–7 business days. We move fast so you can start seeing results sooner.</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFAQ(this)">Do you create custom content for each client?<span class="icon">+</span></button>
+      <div class="faq-a">Yes — every piece of content is tailored to your brand, niche, and audience. We don't use templates or generic edits. Everything is built from your episodes, your voice, your goals.</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFAQ(this)">Can I track performance?<span class="icon">+</span></button>
+      <div class="faq-a">Absolutely. We provide transparent reporting so you can see what's working, what's improving, and how your content is growing over time.</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFAQ(this)">Which platforms do you manage?<span class="icon">+</span></button>
+      <div class="faq-a">We create content optimised for YouTube Shorts, Instagram Reels, TikTok, LinkedIn, and Twitter/X — all from your podcast episodes.</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFAQ(this)">Do you help with lead generation?<span class="icon">+</span></button>
+      <div class="faq-a">Yes. Our entire system is built around turning your content into inbound leads — not just views. Hooks, CTAs, and positioning are all crafted with conversion in mind.</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFAQ(this)">Can I request revisions?<span class="icon">+</span></button>
+      <div class="faq-a">Of course. We offer revisions on all deliverables until you're happy. Your satisfaction and brand alignment are non-negotiable for us.</div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-section reveal">
+  <div class="cta-inner">
+    <div class="cta-shine"></div>
+    <h2>Start Scaling Your Podcast<br>With <em>PodScaleMedia</em></h2>
+    <p>Turn every episode into strategic content that builds authority, drives reach, and brings inbound clients to your brand — consistently.</p>
+    <div class="cta-actions">
+      <a href="https://calendly.com/manishkumarofficial100/30min" target="_blank" class="btn-primary">Book a Free Strategy Call →</a>
+      <a href="#how" class="btn-ghost">See How It Works</a>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <a href="#" class="logo">PodScale<span>Media</span></a>
+  <div class="copy">© 2025 PodScaleMedia. All rights reserved.</div>
+  <div class="links">
+    <a href="https://calendly.com/manishkumarofficial100/30min" target="_blank">Book a Call</a>
+  </div>
+</footer>
+
+<script>
+  // Cursor glow
+  const glow = document.getElementById('cursorGlow');
+  document.addEventListener('mousemove', e => {
+    glow.style.left = e.clientX + 'px';
+    glow.style.top = e.clientY + 'px';
+  });
+
+  // Navbar scroll
+  const nav = document.getElementById('mainNav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 30);
+  });
+
+  // Hamburger
+  function toggleMenu() {
+    document.getElementById('hamburger').classList.toggle('open');
+    document.getElementById('mobileMenu').classList.toggle('open');
+  }
+  function closeMenu() {
+    document.getElementById('hamburger').classList.remove('open');
+    document.getElementById('mobileMenu').classList.remove('open');
+  }
+
+  // FAQ
+  function toggleFAQ(btn) {
+    const item = btn.closest('.faq-item');
+    const isOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+    if (!isOpen) item.classList.add('open');
+  }
+
+  // Scroll reveal
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.07 });
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  // Force autoplay
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('video').forEach(v => {
+      v.muted = true;
+      v.play().catch(() => {});
+    });
+  });
+</script>
+</body>
+</html>
